@@ -1,61 +1,348 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🏗️ Laravel Multitenancy com Subdomínios (Spatie + Apache) - Debian 12
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Este guia documenta a criação de um ambiente multitenant em Laravel utilizando subdomínios, o pacote `spatie/laravel-multitenancy`, e configurações no Apache para desenvolvimento local em Debian 12.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 🔧 1. Configurar domínio local com subdomínios
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Editar `/etc/hosts`
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```bash
+sudo nano /etc/hosts
+127.0.0.1 tenant.test
+127.0.0.1 cliente1.tenant.test
+127.0.0.1 cliente2.tenant.test
+```
 
-## Learning Laravel
+## 🌐 2. Configurar Apache
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Editar `/etc/hosts`
+Instalar e habilitar módulos:
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```bash
+sudo apt install apache2
+sudo a2enmod rewrite
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Criar VirtualHost:
+```bash
+sudo nano /etc/apache2/sites-available/tenant.test.conf
+```
 
-## Laravel Sponsors
+Conteúdo:
+```bash
+<VirtualHost *:80>
+    ServerName tenant.test
+    ServerAlias *.tenant.test
+    DocumentRoot /caminho/para/laravel-multitenant-spatie-api/public
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+    <Directory /caminho/para/laravel-multitenant-spatie-api/public>
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
 
-### Premium Partners
+Habilitar site e reiniciar Apache:
+```bash
+sudo a2ensite tenant.test.conf
+sudo systemctl reload apache2
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## 🚀 3. Criar projeto Laravel
 
-## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+composer create-project laravel/laravel laravel-multitenant-spatie-api
+cd laravel-multitenant-spatie-api
+cp .env.example .env
+php artisan key:generate
 
-## Code of Conduct
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
 
-## Security Vulnerabilities
+Configurar .env
+```bash
+APP_NAME="Multitenant API"
+APP_URL=http://tenant.test
+APP_DOMAIN=tenant.test
+DB_CONNECTION=tenant
+DB_DATABASE=multitenant
+DB_USERNAME=root
+DB_PASSWORD=senha
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```
 
-## License
+Criar banco landlord
+```bash
+mysql -u root -p -e "CREATE DATABASE multitenant;"
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```
+
+
+
+## 📦 4. Instalar e configurar Spatie Laravel Multitenancy
+```bash
+composer require spatie/laravel-multitenancy
+php artisan vendor:publish --tag="multitenancy-config"
+php artisan vendor:publish --tag="multitenancy-migrations"
+
+```
+
+
+Editar config/database.php
+```php
+'default' => env('DB_CONNECTION', 'tenant'),
+
+'tenant' => [
+    'driver' => 'mysql',
+    'host' => env('DB_HOST', '127.0.0.1'),
+    'port' => env('DB_PORT', '3306'),
+    'database' => null, // será definido dinamicamente
+    'username' => env('DB_USERNAME', 'root'),
+    'password' => env('DB_PASSWORD', ''),
+    'charset' => 'utf8mb4',
+    'collation' => 'utf8mb4_unicode_ci',
+],
+
+// Altere o nome da conexão mariadb
+'mariadb' => []
+
+// para landlord
+'landlord' => []
+
+```
+Preparando banco e criar tabelas em landlord
+```bash
+php artisan migrate --database=landlord --path=database/migrations/landlord
+
+```
+
+
+Conceder permissões:
+```bash
+sudo chown -R www-data:www-data storage
+sudo chown -R www-data:www-data bootstrap/cache
+sudo chown -R www-data:www-data storage/logs
+```
+
+
+Criar modelo Tenant
+```bash
+php artisan make:model Tenant
+
+```
+
+
+```php
+// app/Models/Tenant.php
+namespace App\Models;
+
+use Spatie\Multitenancy\Models\Tenant as BaseTenant;
+
+class Tenant extends BaseTenant
+{
+    protected $fillable = ['name', 'domain', 'database'];
+}
+
+```
+
+Editar config/multitenancy.php
+```php
+'tenant_finder' => Spatie\Multitenancy\TenantFinder\DomainTenantFinder::class,
+'tenant_model' => App\Models\Tenant::class,
+'tenant_database_connection_name' => 'tenant',
+'landlord_database_connection_name' => 'landlord',
+
+```
+
+
+## ⚙️ 5. Criar comando Artisan para registrar tenant
+
+```bash
+php artisan make:command CreateTenantCommand
+
+```
+
+Conteúdo:
+```php
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Artisan;
+use App\Models\Tenant;
+use function Laravel\Prompts\text;
+
+class CreateTenantCommand extends Command
+{
+    protected $signature = 'tenant:create';
+    protected $description = 'Cria um tenant com subdomínio e banco de dados isolado';
+
+    public function handle()
+    {
+        $name = text('Give me a name');
+        $domain = text('Give me a domain');
+        $database = 'tenant_' . explode('.', $domain)[0];
+
+        // Verifica se o banco já existe
+        $exists = DB::select("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?", [$database]);
+
+        if (empty($exists)) {
+            DB::statement("CREATE DATABASE `$database`");
+            $this->info("Banco criado.");
+        } else {
+            $this->info("Banco $database já existe.");
+        }
+
+        // Verifica se já existe um tenant com o mesmo domínio ou banco
+        $exists = Tenant::where('domain', $domain)
+            ->orWhere('database', $database)
+            ->first();
+
+        if ($exists) {
+            $this->info("Já existe um tenant com domínio ou banco de dados informados.");
+        } else {
+            Tenant::create([
+                'name' => $name,
+                'domain' => $domain,
+                'database' => $database
+            ]);
+            $this->info("Tenant criado com domínio $domain e banco $database");
+        }
+
+        config()->set('database.connections.tenant.database', $database);
+        DB::purge('tenant');
+        DB::reconnect('tenant');
+
+        Artisan::call('migrate', [
+            '--database' => 'tenant',
+            '--path' => '/database/migrations',
+            '--force' => true,
+        ]);
+    }
+}
+
+```
+
+
+## 🛡️ 6. Criar Middleware SetTenantByDomain
+
+```bash
+php artisan make:middleware SetTenantByDomain
+
+```
+```php
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+use App\Models\Tenant;
+use Illuminate\Support\Facades\DB;
+
+class SetTenantByDomain
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        $host = $request->getHost(); // Exemplo: cliente1.tenant.test
+
+        // Busca o tenant com base no domínio completo
+        $tenant = Tenant::where('domain', $host)->first();
+
+        if (!$tenant) {
+            abort(404, 'Tenant não encontrado');
+        }
+
+        // Define a base do tenant dinamicamente
+        config()->set('database.connections.tenant.database', $tenant->database);
+        DB::purge('tenant');
+        DB::reconnect('tenant');
+
+        // Define o tenant atual na Spatie
+        $tenant->makeCurrent();
+
+        return $next($request);
+    }
+}
+
+```
+
+Configure no bootstrap/app.php:
+
+```php
+// Adicione o arquivo api.php
+->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
+        commands: __DIR__.'/../routes/console.php',
+        health: '/up',
+    )
+// Adicione a Middleware SetTenantByDomain
+->withMiddleware(function (Middleware $middleware): void {
+    $middleware->group('api', [
+        SetTenantByDomain::class,
+    ]);
+})
+
+```
+
+
+## 🛣️ 7. Criar rotas da API
+
+```php
+// routes/api.php
+
+use Illuminate\Support\Facades\Route;
+use Spatie\Multitenancy\Http\Middleware\NeedsTenant;
+use App\Models\User;
+
+Route::middleware([NeedsTenant::class])->get('/', fn() => ['Teste']);
+
+Route::middleware([NeedsTenant::class])->get('/create', function () {
+    User::factory()->count(10)->create();
+    return ['Usuarios' => User::all()];
+});
+
+Route::middleware([NeedsTenant::class])->get('/show', fn() => ['Usuarios' => User::all()]);
+
+```
+
+## 🧪 8. Testando os subdomínios
+
+Rodar comando para criar um cliente:
+```bash
+sudo -u www-data php artisan tenant:create
+
+ ┌ Give me a name ──────────────────────────────────────────────┐
+ │ cliente1                                                     │
+ └──────────────────────────────────────────────────────────────┘
+
+ ┌ Give me a domain ────────────────────────────────────────────┐
+ │ cliente1.tenant.test                                         │
+ └──────────────────────────────────────────────────────────────┘
+
+```
+
+- http://cliente1.tenant.test/api/create
+
+- http://cliente2.tenant.test/api/create
+
+- http://cliente1.tenant.test/api/show
+
+- http://cliente2.tenant.test/api/show
+
+## 📌 9. Observações
+
+- O nome do banco é derivado do subdomínio (tenant_cliente1, por exemplo).
+
+- Os migrations dos tenants devem estar em /database/migrations.
+
+- Os migrations do landlord devem estar em /database/migrations/landlord.
+
+- O middleware SetTenantByDomain pode ser customizado para lógica adicional.
+
+- É importante isolar bem as responsabilidades entre landlord e tenants.
+
+
