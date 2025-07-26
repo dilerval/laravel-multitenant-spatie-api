@@ -154,7 +154,7 @@ Editar config/multitenancy.php
 'tenant_model' => App\Models\Tenant::class,
 'tenant_database_connection_name' => 'tenant',
 'landlord_database_connection_name' => 'landlord',
-
+'switch_tenant_tasks' => [ \Spatie\Multitenancy\Tasks\SwitchTenantDatabaseTask::class,],
 ```
 
 
@@ -227,47 +227,7 @@ class CreateTenantCommand extends Command
 ```
 
 
-## 🛡️ 6. Criar Middleware SetTenantByDomain
-
-```bash
-php artisan make:middleware SetTenantByDomain
-
-```
-```php
-namespace App\Http\Middleware;
-
-use Closure;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
-use App\Models\Tenant;
-use Illuminate\Support\Facades\DB;
-
-class SetTenantByDomain
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        $host = $request->getHost(); // Exemplo: cliente1.tenant.test
-
-        // Busca o tenant com base no domínio completo
-        $tenant = Tenant::where('domain', $host)->first();
-
-        if (!$tenant) {
-            abort(404, 'Tenant não encontrado');
-        }
-
-        // Define a base do tenant dinamicamente
-        config()->set('database.connections.tenant.database', $tenant->database);
-        DB::purge('tenant');
-        DB::reconnect('tenant');
-
-        // Define o tenant atual na Spatie
-        $tenant->makeCurrent();
-
-        return $next($request);
-    }
-}
-
-```
+## 🛣️ 6. Criar rotas da API
 
 Configure no bootstrap/app.php:
 
@@ -279,17 +239,7 @@ Configure no bootstrap/app.php:
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-// Adicione a Middleware SetTenantByDomain
-->withMiddleware(function (Middleware $middleware): void {
-    $middleware->group('api', [
-        SetTenantByDomain::class,
-    ]);
-})
-
 ```
-
-
-## 🛣️ 7. Criar rotas da API
 
 ```php
 // routes/api.php
@@ -298,18 +248,18 @@ use Illuminate\Support\Facades\Route;
 use Spatie\Multitenancy\Http\Middleware\NeedsTenant;
 use App\Models\User;
 
-Route::middleware([NeedsTenant::class])->get('/', fn() => ['Teste']);
+Route::get('/', fn() => ['Teste']);
 
-Route::middleware([NeedsTenant::class])->get('/create', function () {
+Route::get('/create', function () {
     User::factory()->count(10)->create();
     return ['Usuarios' => User::all()];
 });
 
-Route::middleware([NeedsTenant::class])->get('/show', fn() => ['Usuarios' => User::all()]);
+Route::get('/show', fn() => ['Usuarios' => User::all()]);
 
 ```
 
-## 🧪 8. Testando os subdomínios
+## 🧪 7. Testando os subdomínios
 
 Rodar comando para criar um cliente:
 ```bash
@@ -333,7 +283,7 @@ sudo -u www-data php artisan tenant:create
 
 - http://cliente2.tenant.test/api/show
 
-## 📌 9. Observações
+## 📌 8. Observações
 
 - O nome do banco é derivado do subdomínio (tenant_cliente1, por exemplo).
 
