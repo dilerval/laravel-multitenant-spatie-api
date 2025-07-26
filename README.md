@@ -240,7 +240,6 @@ Configure no bootstrap/app.php:
         health: '/up',
     )
 ```
-
 ```php
 // routes/api.php
 
@@ -290,8 +289,6 @@ sudo -u www-data php artisan tenant:create
 - Os migrations dos tenants devem estar em /database/migrations.
 
 - Os migrations do landlord devem estar em /database/migrations/landlord.
-
-- O middleware SetTenantByDomain pode ser customizado para lógica adicional.
 
 - É importante isolar bem as responsabilidades entre landlord e tenants.
 
